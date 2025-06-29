@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英語学習アプリ</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- タイトル画面 -->
+    <div id="start-screen" class="container">
+        <h1>英語学習アプリ</h1>
+        <button id="start-quiz-button">開始</button>
+        <button id="select-question-button">問題を選択</button>
+    </div>
+
+    <!-- クイズ画面 -->
+    <div id="quiz-screen" class="container hidden">
+        <div id="question-counter"></div>
+        <div class="mode-selector">
+            <label for="mode">学習モードを選択:</label>
+            <select id="mode">
+                <option value="en-ja">英語 → 日本語</option>
+                <option value="ja-en">日本語 → 英語</option>
+                <option value="random">ランダム</option>
+            </select>
+        </div>
+        <div id="question-container">
+            <p id="sentence-display"></p>
+        </div>
+        <div id="answer-container">
+            <div id="answer-box"></div>
+        </div>
+        <div id="word-bank"></div>
+        <button id="check-button">チェック</button>
+        <button id="next-button">次へ</button>
+        <button id="show-answer-button">答えを表示</button>
+        <p id="result"></p>
+        <button id="back-to-title-from-quiz">タイトルへ戻る</button>
+    </div>
+
+    <!-- 問題一覧画面 -->
+    <div id="list-screen" class="container hidden">
+        <h2>問題一覧</h2>
+        <div class="list-buttons">
+            <button id="select-all-button">全ての問題をチェックする</button>
+            <button id="deselect-all-button">全てのチェックを外す</button>
+        </div>
+        <table id="question-table">
+            <thead>
+                <tr>
+                    <th>選択</th>
+                    <th>英語</th>
+                    <th>日本語</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- JavaScriptで問題が挿入されます -->
+            </tbody>
+        </table>
+        <button id="back-to-title-from-list">タイトルへ戻る</button>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
