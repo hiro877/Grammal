@@ -44,8 +44,15 @@
     <div id="list-screen" class="container hidden">
         <h2>問題一覧</h2>
         <div class="list-buttons">
+            <div class="dataset-selector">
+                <label for="dataset-select">問題セット:</label>
+                <select id="dataset-select"></select>
+            </div>
             <button id="select-all-button">全ての問題をチェックする</button>
             <button id="deselect-all-button">全てのチェックを外す</button>
+            <label for="upload-data-file" class="button-like-label">新しい問題をアップロード</label>
+            <input type="file" id="upload-data-file" accept=".js" style="display: none;">
+            <button id="delete-dataset-button">この問題を削除</button>
         </div>
         <table id="question-table">
             <thead>

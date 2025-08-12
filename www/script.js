@@ -1,3 +1,6 @@
+// data.jsから読み込まれるグローバルなsentences変数を、このスクリプトのスコープで安全に扱うための準備
+const originalSentences = [...sentences];
+
 const startScreen = document.getElementById('start-screen');
 const quizScreen = document.getElementById('quiz-screen');
 const listScreen = document.getElementById('list-screen');
@@ -8,6 +11,9 @@ const backToTitleFromQuiz = document.getElementById('back-to-title-from-quiz');
 const backToTitleFromList = document.getElementById('back-to-title-from-list');
 const selectAllButton = document.getElementById('select-all-button');
 const deselectAllButton = document.getElementById('deselect-all-button');
+const uploadDataFile = document.getElementById('upload-data-file');
+const deleteDatasetButton = document.getElementById('delete-dataset-button');
+const datasetSelect = document.getElementById('dataset-select');
 
 const sentenceDisplay = document.getElementById('sentence-display');
 const wordBank = document.getElementById('word-bank');
@@ -23,10 +29,119 @@ const questionCounter = document.getElementById('question-counter');
 let activeSentences = [];
 let currentSentenceIndex = 0;
 let currentMode = 'en-ja';
-let questionCheckedState = new Array(sentences.length).fill(true);
+let questionCheckedState = [];
 let score = 0;
+let currentSentences = []; // 現在選択されている問題セットを保持
+const STORAGE_KEY = 'custom_english_quiz_datasets';
+
+// --- データセット管理ロジック ---
+
+// スクリプトを動的に読み込むヘルパー関数
+function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+        document.head.appendChild(script);
+    });
+}
+
+function getCustomDatasets() {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+}
+
+function saveCustomDatasets(datasets) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(datasets));
+}
+
+async function updateDatasetSelector() {
+    const customDatasets = getCustomDatasets();
+    const selectedValue = datasetSelect.value;
+
+    datasetSelect.innerHTML = '<option value="original">元の問題</option>';
+    
+    // 静的データセットを追加
+    if (typeof staticDatasets !== 'undefined') { // staticDatasetsがロードされているか確認
+        staticDatasets.forEach(dataset => {
+            const option = document.createElement('option');
+            option.value = `static-${dataset.name}`;
+            option.textContent = `静的: ${dataset.name}`;
+            datasetSelect.appendChild(option);
+        });
+    }
+
+    // カスタムデータセットを追加
+    for (const name in customDatasets) {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        datasetSelect.appendChild(option);
+    }
+    
+    // 以前選択していた値があればそれを復元、なければ「元の問題」を選択
+    if (selectedValue && (customDatasets[selectedValue] || selectedValue.startsWith('static-'))) {
+        datasetSelect.value = selectedValue;
+    } else {
+        datasetSelect.value = 'original';
+    }
+    
+    deleteDatasetButton.style.display = datasetSelect.value === 'original' || datasetSelect.value.startsWith('static-') ? 'none' : 'inline-block';
+}
+
+async function loadSelectedDataset() {
+    const selectedName = datasetSelect.value;
+    if (selectedName === 'original') {
+        currentSentences = [...originalSentences];
+    } else if (selectedName.startsWith('static-')) {
+        const staticDatasetName = selectedName.replace('static-', '');
+        const datasetInfo = staticDatasets.find(d => d.name === staticDatasetName);
+        if (datasetInfo) {
+            try {
+                const response = await fetch(datasetInfo.path);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const fileContent = await response.text();
+                // ファイル内容を安全に評価してsentences配列を取得
+                const newSentences = new Function(`${fileContent}; return sentences;`)();
+                if (!Array.isArray(newSentences)) {
+                    throw new Error('ファイルに"sentences"という名前の配列が含まれていません。');
+                }
+                currentSentences = [...newSentences];
+            } catch (error) {
+                console.error(`静的データセットの読み込みに失敗しました: ${datasetInfo.path}`, error);
+                alert(`静的データセット「${staticDatasetName}」の読み込みに失敗しました。エラー: ${error.message}`);
+                currentSentences = []; // エラー時は空にするか、元の問題に戻す
+            }
+        } else {
+            currentSentences = [];
+        }
+    } else {
+        const customDatasets = getCustomDatasets();
+        currentSentences = customDatasets[selectedName];
+    }
+    questionCheckedState = new Array(currentSentences.length).fill(true);
+    populateQuestionList();
+}
+
+// アプリ起動時に静的データセットマニフェストをロード
+loadScript('./static_datasets_manifest.js')
+    .then(() => {
+        console.log('Static datasets manifest loaded.');
+        // マニフェストロード後に初期化処理を呼び出す
+        updateDatasetSelector();
+        loadSelectedDataset();
+    })
+    .catch(error => {
+        console.error('Failed to load static datasets manifest:', error);
+        // マニフェストがロードできない場合でも、アプリの基本機能は動作するようにする
+        updateDatasetSelector();
+        loadSelectedDataset();
+    });
 
 // --- 画面遷移ロジック ---
+
 startQuizButton.addEventListener('click', () => {
     const selectedIndexes = [];
     questionCheckedState.forEach((isChecked, index) => {
@@ -42,7 +157,7 @@ startQuizButton.addEventListener('click', () => {
 
     activeSentences = selectedIndexes.map(index => ({
         originalIndex: index,
-        sentence: sentences[index],
+        sentence: currentSentences[index],
         answeredCorrectly: false
     }));
     currentSentenceIndex = 0;
@@ -56,7 +171,8 @@ startQuizButton.addEventListener('click', () => {
 selectQuestionButton.addEventListener('click', () => {
     startScreen.classList.add('hidden');
     listScreen.classList.remove('hidden');
-    populateQuestionList();
+    updateDatasetSelector();
+    loadSelectedDataset();
 });
 
 function goBackToTitle() {
@@ -78,10 +194,67 @@ deselectAllButton.addEventListener('click', () => {
     populateQuestionList();
 });
 
+// --- データセット関連イベントリスナー ---
+
+datasetSelect.addEventListener('change', loadSelectedDataset);
+
+uploadDataFile.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const datasetName = prompt('この問題セットの名前を入力してください:', file.name.replace(/\.js$/, ''));
+    if (!datasetName) {
+        uploadDataFile.value = ''; // プロンプトがキャンセルされた場合もリセット
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const fileContent = e.target.result;
+            // ファイル内容を安全に評価してsentences配列を取得
+            const newSentences = new Function(`${fileContent}; return sentences;`)();
+            if (!Array.isArray(newSentences)) {
+                throw new Error('ファイルに"sentences"という名前の配列が含まれていません。');
+            }
+
+            const customDatasets = getCustomDatasets();
+            customDatasets[datasetName] = newSentences;
+            saveCustomDatasets(customDatasets);
+
+            updateDatasetSelector();
+            datasetSelect.value = datasetName; // アップロードしたデータセットを選択状態にする
+            loadSelectedDataset();
+            alert(`問題セット「${datasetName}」が保存されました。`);
+        } catch (error) {
+            console.error('ファイルの処理中にエラーが発生しました:', error);
+            alert(`エラー: ${error.message}`);
+        }
+    };
+    reader.readAsText(file);
+    uploadDataFile.value = ''; // 同じファイルを連続で選択できるようにリセット
+});
+
+deleteDatasetButton.addEventListener('click', () => {
+    const selectedName = datasetSelect.value;
+    if (selectedName === 'original' || !confirm(`問題セット「${selectedName}」を削除しますか？この操作は元に戻せません。`)) {
+        return;
+    }
+
+    const customDatasets = getCustomDatasets();
+    delete customDatasets[selectedName];
+    saveCustomDatasets(customDatasets);
+
+    updateDatasetSelector();
+    loadSelectedDataset(); // リストを再読み込み
+    alert(`問題セット「${selectedName}」を削除しました。`);
+});
+
+
 // --- 問題一覧表示ロジック ---
 function populateQuestionList() {
     questionTableBody.innerHTML = '';
-    sentences.forEach((sentence, index) => {
+    currentSentences.forEach((sentence, index) => {
         const row = document.createElement('tr');
         
         const checkboxCell = document.createElement('td');

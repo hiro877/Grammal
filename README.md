@@ -38,3 +38,28 @@
 *   音声読み上げ機能
 *   スコアの永続化
 *   より詳細な学習進捗の可視化
+
+## Androidビルド手順
+
+このアプリケーションはCapacitorを使用してAndroidアプリとしてビルドできます。
+
+1.  **依存関係のインストール:**
+    プロジェクトのルートディレクトリで以下のコマンドを実行し、必要なパッケージをインストールします。
+    ```bash
+    npm install
+    ```
+
+2.  **Webアセットの同期:**
+    Webアプリケーションのコード (`www` フォルダ) をAndroidプロジェクトに同期します。
+    ```bash
+    npx cap sync android
+    ```
+
+3.  **Android Studioで開く:**
+    以下のコマンドでAndroidプロジェクトをAndroid Studioで開きます。
+    ```bash
+    npx cap open android
+    ```
+
+4.  **APKのビルド:**
+    Android Studioが開いたら、メニューバーから **[Build]** > **[Build Bundle(s) / APK(s)]** > **[Build APK(s)]** を選択してAPKファイルを生成します。
